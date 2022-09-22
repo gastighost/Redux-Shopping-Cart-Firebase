@@ -1,9 +1,87 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { showNotification } from "../ui/uiSlice";
+
+import axios from "axios";
 
 const initialState = {
   items: [],
   totalQuantity: 0,
+  fetched: false,
 };
+
+export const fetchCartData = createAsyncThunk(
+  "cart/fetchCartData",
+  async (_, thunkAPI) => {
+    thunkAPI.dispatch(
+      showNotification({
+        status: "pending",
+        title: "Fetching cart...",
+        message: "Fetching cart data!",
+      })
+    );
+
+    try {
+      const response = await axios.get(
+        "https://redux-cart-project-273a8-default-rtdb.firebaseio.com/cart.json"
+      );
+      thunkAPI.dispatch(
+        showNotification({
+          status: "success",
+          title: "Success!",
+          message: "Retrieved cart data successfully!",
+        })
+      );
+
+      return response.data;
+    } catch (error) {
+      thunkAPI.dispatch(
+        showNotification({
+          status: "error",
+          title: "Error!",
+          message: "Fetching cart data failed!",
+        })
+      );
+    }
+  }
+);
+
+export const sendCartData = createAsyncThunk(
+  "cart/sendCartData",
+  async (cart, thunkAPI) => {
+    const { items, totalQuantity } = cart;
+
+    thunkAPI.dispatch(
+      showNotification({
+        status: "pending",
+        title: "Sending...",
+        message: "Sending cart data!",
+      })
+    );
+    try {
+      const response = await axios.put(
+        "https://redux-cart-project-273a8-default-rtdb.firebaseio.com/cart.json",
+        { items, totalQuantity }
+      );
+      thunkAPI.dispatch(
+        showNotification({
+          status: "success",
+          title: "Success!",
+          message: "Sent cart data successfully!",
+        })
+      );
+
+      return response.data;
+    } catch (error) {
+      thunkAPI.dispatch(
+        showNotification({
+          status: "error",
+          title: "Error!",
+          message: "Sending cart data failed!",
+        })
+      );
+    }
+  }
+);
 
 const cartSlice = createSlice({
   name: "cart",
@@ -26,6 +104,7 @@ const cartSlice = createSlice({
         state.items[index].totalPrice += price;
       }
       state.totalQuantity += 1;
+      state.fetched = true;
     },
     removeItemFromCart: (state, action) => {
       const id = action.payload;
@@ -42,7 +121,24 @@ const cartSlice = createSlice({
       if (state.totalQuantity > 0) {
         state.totalQuantity -= 1;
       }
+      state.fetched = true;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchCartData.fulfilled, (state, action) => {
+        const { items, totalQuantity } = action.payload;
+        return {
+          items: items || [],
+          totalQuantity: totalQuantity || 0,
+          fetched: false,
+        };
+      })
+      .addCase(sendCartData.fulfilled, (state, action) => {
+        const { items, totalQuantity } = action.payload;
+        console.log(state.fetched);
+        state = { items, totalQuantity };
+      });
   },
 });
 
